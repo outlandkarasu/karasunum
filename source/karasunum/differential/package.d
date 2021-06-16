@@ -12,5 +12,4 @@ public import karasunum.differential.div;
 public import karasunum.differential.pow;
 public import karasunum.differential.exp;
 public import karasunum.differential.log;
-public import karasunum.differential.newton;
 

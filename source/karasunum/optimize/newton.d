@@ -1,7 +1,7 @@
 /**
 Newton's method implementation module.
 */
-module karasunum.differential.newton;
+module karasunum.optimize.newton;
 
 import karasunum.differential.differentiable :
     Differentiable,
