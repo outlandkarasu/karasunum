@@ -150,6 +150,9 @@ private:
     assert(kalmanFilter.likelihood.isClose(5.14895, 1e-5, 1e-5));
 
     assert(kalmanFilter.estimate(1.0).isClose(10.314, 1e-5, 1e-5));
+    immutable filtered2 = kalmanFilter.filtering(3.0, 10.0);
+    assert(filtered2.isClose(7.2169, 1e-5, 1e-5));
+    assert(kalmanFilter.likelihood.isClose(10.0746, 1e-5, 1e-5));
 }
 
 private:
