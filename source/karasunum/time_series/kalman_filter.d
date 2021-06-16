@@ -15,20 +15,18 @@ import karasunum.differential :
 
 @safe:
 
-private template RebindableType(T)
-{
-    static if (is(T == class) || is(T == interface) || isDynamicArray!T || isAssociativeArray!T)
-    {
-        alias RebindableType = Rebindable!T;
-    }
-    else
-    {
-        alias RebindableType = T;
-    }
-}
+/**
+Kalman filter.
 
+Params:
+    F = functional type.
+    P = parameter type.
+*/
 struct KalmanFilter(F, P)
 {
+    /**
+    Kalman filter parameters.
+    */
     struct Parameters
     {
         P drift;
@@ -41,6 +39,15 @@ struct KalmanFilter(F, P)
 
     @disable this();
 
+    /**
+    Construct from parameters.
+
+    Params:
+        parameters = Kalman filter parameters.
+        initState = initial state value.
+        initVariance = initial kalman filter variance.
+        one = one value.
+    */
     this(Parameters parameters, F initState, F initVariance, F one) nothrow pure scope
     {
         this.params_ = parameters;
@@ -49,6 +56,14 @@ struct KalmanFilter(F, P)
         this.one_ = one;
     }
 
+    /**
+    Estimate next value.
+
+    Params:
+        x = x value.
+    Returns:
+        estimated value.
+    */
     F estimate(F x) nothrow pure return scope
     {
         estimateState_ = params_.drift + params_.tension * state_;
@@ -57,25 +72,42 @@ struct KalmanFilter(F, P)
         return estimateMeasure_;
     }
 
+    /**
+    Filtering kalman filter.
+
+    Params:
+        x = x value.
+        y = y value.
+    Returns:
+        filtered state value.
+    */
     F filtering(F x, F y) nothrow pure scope
     {
         auto error = y - estimateMeasure_;
         auto errorVariance = estimateVariance_ * x.square + params_.measureVariance;
         auto currentLikelihood = (log(errorVariance) + error.square / errorVariance);
 
-        if (time_ >= params_.likelihoodSkipCount)
+        if (time_ == params_.likelihoodSkipCount)
         {
-            likelihood_ = (likelihood_) ? (likelihood_ + currentLikelihood) : currentLikelihood;
+            likelihood_ = currentLikelihood;
         }
+        else if (time_ > params_.likelihoodSkipCount)
+        {
+            likelihood_ = likelihood_ + currentLikelihood;
+        }
+
         ++time_;
 
         auto k = (x * estimateVariance_)
-            / (x.square * estimateVariance_ + params_.measureVariance);
-        state_ = estimateState_ + k * error;
+            / (x.square * estimateVariance_ + params_.measureVariance); state_ = estimateState_ + k * error;
         variance_ = (one_ - x * k) * estimateVariance_;
         return state_;
     }
 
+    /**
+    Returns:
+        likelihood value.
+    */
     @property F likelihood() const @nogc nothrow pure scope
     {
         return likelihood_;
@@ -92,5 +124,49 @@ private:
     RebindableType!F estimateMeasure_;
     RebindableType!F likelihood_;
     size_t time_;
+}
+
+///
+@nogc nothrow pure @safe unittest
+{
+    import std.math : isClose;
+
+    alias KF = KalmanFilter!(double, double);
+
+    immutable KF.Parameters parameters = {
+        drift: 1.0,
+        tension: 2.0,
+        cons: 3.0,
+        measureVariance: 10.0,
+        stateVariance: 10.0,
+        likelihoodSkipCount: 0,
+    };
+
+    auto kalmanFilter = KF(parameters, 1.0, 2.0, 1.0);
+    assert(kalmanFilter.estimate(3.0).isClose(12.0));
+
+    immutable filtered = kalmanFilter.filtering(3.0, 12.5);
+    assert(filtered.isClose(3.156977, 1e-6, 1e-6));
+    assert(kalmanFilter.likelihood.isClose(5.14895, 1e-6, 1e-6));
+}
+
+private:
+
+enum isReferenceType(T)
+    = is(T == class)
+    || is(T == interface)
+    || isDynamicArray!T
+    || isAssociativeArray!T;
+
+template RebindableType(T)
+{
+    static if (isReferenceType!T)
+    {
+        alias RebindableType = Rebindable!T;
+    }
+    else
+    {
+        alias RebindableType = T;
+    }
 }
 
