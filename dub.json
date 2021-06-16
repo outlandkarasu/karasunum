@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"outland.karasu@gmail.com"
+	],
+	"description": "A numerical library for personal use.",
+	"license": "BSL-1.0",
+	"name": "karasunum",
+	"target": "sourceLibrary"
+}

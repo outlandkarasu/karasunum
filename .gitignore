@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/karasunum
+karasunum.so
+karasunum.dylib
+karasunum.dll
+karasunum.a
+karasunum.lib
+karasunum-test-*
+*.exe
+*.o
+*.obj
+*.lst
