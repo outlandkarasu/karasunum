@@ -51,6 +51,7 @@ struct KalmanFilter(F, P)
     this(Parameters parameters, F initState, F initVariance, F one) nothrow pure scope
     {
         this.params_ = parameters;
+        this.tensionSquare_ = parameters.tension.square;
         this.state_ = initState;
         this.variance_ = initVariance;
         this.one_ = one;
@@ -68,7 +69,7 @@ struct KalmanFilter(F, P)
     {
         estimateState_ = params_.drift + params_.tension * state_;
         estimateMeasure_ = params_.cons + estimateState_ * x;
-        estimateVariance_ = params_.tension.square * variance_ + params_.stateVariance;
+        estimateVariance_ = tensionSquare_ * variance_ + params_.stateVariance;
         return estimateMeasure_;
     }
 
@@ -85,7 +86,7 @@ struct KalmanFilter(F, P)
     {
         auto error = y - estimateMeasure_;
         auto errorVariance = estimateVariance_ * x.square + params_.measureVariance;
-        auto currentLikelihood = (log(errorVariance) + error.square / errorVariance);
+        auto currentLikelihood = log(errorVariance) + error.square / errorVariance;
 
         if (time_ == params_.likelihoodSkipCount)
         {
@@ -99,7 +100,8 @@ struct KalmanFilter(F, P)
         ++time_;
 
         auto k = (x * estimateVariance_)
-            / (x.square * estimateVariance_ + params_.measureVariance); state_ = estimateState_ + k * error;
+            / (x.square * estimateVariance_ + params_.measureVariance);
+        state_ = estimateState_ + k * error;
         variance_ = (one_ - x * k) * estimateVariance_;
         return state_;
     }
@@ -115,6 +117,7 @@ struct KalmanFilter(F, P)
 
 private:
     Parameters params_;
+    F tensionSquare_;
     F one_;
     RebindableType!F state_;
     RebindableType!F variance_;
