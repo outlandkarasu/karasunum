@@ -11,7 +11,8 @@ import karasunum.differential :
     Differentiable,
     constant,
     square,
-    log;
+    log,
+    exp;
 
 @safe:
 
@@ -32,8 +33,8 @@ struct KalmanFilter(F, P)
         P drift;
         P tension;
         P cons;
-        P measureVariance;
-        P stateVariance;
+        P logMeasureVariance;
+        P logStateVariance;
         size_t likelihoodSkipCount = 0;
     }
 
@@ -46,15 +47,15 @@ struct KalmanFilter(F, P)
         parameters = Kalman filter parameters.
         initState = initial state value.
         initVariance = initial kalman filter variance.
-        one = one value.
     */
-    this(Parameters parameters, F initState, F initVariance, F one) nothrow pure scope
+    this(Parameters parameters, F initState, F initVariance) nothrow pure scope
     {
         this.params_ = parameters;
         this.tensionSquare_ = parameters.tension.square;
+        this.stateVariance_ = exp(parameters.logStateVariance);
+        this.measureVariance_ = exp(parameters.logMeasureVariance);
         this.state_ = initState;
         this.variance_ = initVariance;
-        this.one_ = one;
     }
 
     /**
@@ -69,7 +70,7 @@ struct KalmanFilter(F, P)
     {
         estimateState_ = params_.drift + params_.tension * state_;
         estimateMeasure_ = params_.cons + estimateState_ * x;
-        estimateVariance_ = tensionSquare_ * variance_ + params_.stateVariance;
+        estimateVariance_ = tensionSquare_ * variance_ + stateVariance_;
         return estimateMeasure_;
     }
 
@@ -85,7 +86,7 @@ struct KalmanFilter(F, P)
     F filtering(F x, F y) nothrow pure scope
     {
         auto error = y - estimateMeasure_;
-        auto errorVariance = estimateVariance_ * x.square + params_.measureVariance;
+        auto errorVariance = estimateVariance_ * x.square + measureVariance_;
         auto currentLikelihood = log(errorVariance) + error.square / errorVariance;
 
         if (time_ == params_.likelihoodSkipCount)
@@ -99,10 +100,10 @@ struct KalmanFilter(F, P)
 
         ++time_;
 
-        auto k = (x * estimateVariance_)
-            / (x.square * estimateVariance_ + params_.measureVariance);
+        auto xev = x * estimateVariance_;
+        auto k = xev / (x * xev + measureVariance_);
         state_ = estimateState_ + k * error;
-        variance_ = (one_ - x * k) * estimateVariance_;
+        variance_ = estimateVariance_ - xev * k;
         return state_;
     }
 
@@ -118,7 +119,8 @@ struct KalmanFilter(F, P)
 private:
     Parameters params_;
     F tensionSquare_;
-    F one_;
+    F stateVariance_;
+    F measureVariance_;
     RebindableType!F state_;
     RebindableType!F variance_;
 
@@ -140,12 +142,12 @@ private:
         drift: 1.0,
         tension: 2.0,
         cons: 3.0,
-        measureVariance: 10.0,
-        stateVariance: 10.0,
+        logMeasureVariance: log(10.0),
+        logStateVariance: log(10.0),
         likelihoodSkipCount: 0,
     };
 
-    auto kalmanFilter = KF(parameters, 1.0, 2.0, 1.0);
+    auto kalmanFilter = KF(parameters, 1.0, 2.0);
     assert(kalmanFilter.estimate(3.0).isClose(12.0));
 
     immutable filtered = kalmanFilter.filtering(3.0, 12.5);
